@@ -1,0 +1,111 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "Build turi (afatRelease = tayyor ilova, afatDebug = tezroq sinov)"
+        type: choice
+        default: afatRelease
+        options: [afatRelease, afatDebug]
+      app_name:
+        description: "Ilova nomi (telefonda ko'rinadi)"
+        default: "Klon"
+      app_package:
+        description: "Paket nomi (kichik harf, nuqta bilan), masalan uz.sizning.klon"
+        default: "uz.klon.messenger"
+      features:
+        description: "Funksiyalar (vergul bilan): settings_ui,more_accounts,ghost_read,no_typing,ghost_stories,hide_online. Birinchi marta BO'SH qoldiring"
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      # Telegram manba kodining sinab ko'rilgan versiyasi (patchlar shunga moslab yozilgan)
+      UPSTREAM_SHA: 7be672ead283d022812d75c729d3a04dd4c2a2c6
+    steps:
+      - name: Bu reponi yuklash
+        uses: actions/checkout@v4
+
+      - name: Maxfiy kalitlar borligini tekshirish
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+        run: |
+          if [ -z "$TG_API_ID" ] || [ -z "$TG_API_HASH" ]; then
+            echo "::error::Repo Settings > Secrets and variables > Actions ichida TG_API_ID va TG_API_HASH yarating (my.telegram.org dan)."
+            exit 1
+          fi
+
+      - name: Telegram rasmiy manba kodini yuklash
+        run: |
+          mkdir tg && cd tg
+          git init -q
+          git remote add origin https://github.com/DrKLO/Telegram.git
+          git fetch --depth 1 origin "$UPSTREAM_SHA"
+          git checkout -q FETCH_HEAD
+          git log -1 --oneline
+
+      - name: Patch qo'llash (brending, kalitlar, funksiyalar)
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          APP_PACKAGE: ${{ inputs.app_package }}
+          APP_NAME: ${{ inputs.app_name }}
+          FEATURES: ${{ inputs.features }}
+        run: python3 patch.py tg
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android SDK / NDK o'rnatish
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+
+      - name: Gradle keshi
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ env.UPSTREAM_SHA }}-${{ hashFiles('patch.py') }}
+          restore-keys: gradle-${{ env.UPSTREAM_SHA }}-
+
+      - name: APK yig'ish (20-60 daqiqa olishi mumkin)
+        working-directory: tg
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace ":TMessagesProj_App:assemble${{ inputs.variant == 'afatDebug' && 'AfatDebug' || 'AfatRelease' }}"
+
+      - name: APK ni topish
+        id: apk
+        run: |
+          APK=$(find tg/TMessagesProj_App/build/outputs/apk -name "*.apk" | head -n 1)
+          test -n "$APK" || { echo "::error::APK topilmadi"; exit 1; }
+          cp "$APK" klon.apk
+          ls -lh klon.apk
+
+      - name: Release sifatida e'lon qilish (telefondan to'g'ridan-to'g'ri yuklab olish uchun)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "build-${{ github.run_number }}" klon.apk \
+            --title "Build #${{ github.run_number }}" \
+            --notes "variant=${{ inputs.variant }}; funksiyalar=${{ inputs.features }}; upstream=${UPSTREAM_SHA}"
+
+      - name: Artifact sifatida ham saqlash
+        uses: actions/upload-artifact@v4
+        with:
+          name: klon-apk
+          path: klon.apk
