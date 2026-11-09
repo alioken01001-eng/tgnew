@@ -4,7 +4,7 @@ This repository uses GitHub Actions so the Android APK can be built from an Andr
 
 ## Status and safety
 
-- `tgx/cloud-build` is the cloud-build setup branch.
+- `tgx/cloud-build` is the cloud-build setup branch. A pull request to `main` is needed before these manually triggered workflows appear in the Actions tab: GitHub only accepts `workflow_dispatch` events when the workflow file exists on the default branch. The changes are not merged automatically.
 - The original NimarkoGram workflow builds upstream source without applying the TGX branding patch.
 - The TGX Studio Phase 1 workflow first builds the original upstream APK as a baseline gate, then applies a small, exact-match branding patch and builds TGX.
 - The current Phase 1 patch changes the app label, application ID and launcher icon. The Light/Dark/System selector and a custom splash-screen redesign are **not implemented yet**.
@@ -35,7 +35,7 @@ These values are used only to generate the runner's temporary `private.propertie
 1. Open **Actions → TGX Studio Phase 1 APK → Run workflow**.
 2. Use the same `upstream_ref` you used for the baseline build if you want the same source revision.
 3. The workflow builds the original app first. If that baseline build fails, it stops before applying TGX branding.
-4. If both builds succeed, download `tgx-studio-phase1-apk` and `tgx-phase1-build-logs` from that run.
+4. If both builds succeed, download `tgx-studio-phase1-apk`, `nimarkogram-original-baseline-apk`, and `tgx-phase1-build-logs` from that run. The original APK is copied aside before the branding patch so the two APK artifacts are not accidentally identical.
 
 ## 4. Install the APK on Android
 
