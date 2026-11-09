@@ -94,6 +94,15 @@ jobs:
           mkdir -p ../baseline-apk
           cp TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk ../baseline-apk/nimarkogram-original.apk
 
+      - name: Upload original NimarkoGram baseline APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nimarkogram-original-baseline-apk
+          path: baseline-apk/nimarkogram-original.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Apply TGX Studio Phase 1 branding patch
         run: |
           python scripts/apply_tgx_phase1.py nimarkogram
@@ -128,15 +137,6 @@ jobs:
         with:
           name: tgx-studio-phase1-apk
           path: nimarkogram/TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload original baseline APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nimarkogram-original-baseline-apk
-          path: baseline-apk/nimarkogram-original.apk
           if-no-files-found: error
           retention-days: 14
 
