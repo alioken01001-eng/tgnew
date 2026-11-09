@@ -92,7 +92,9 @@ jobs:
             -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
             :TMessagesProj_AppStandalone:assembleAfatStandalone 2>&1 | tee ../build-logs/original-build.log
           mkdir -p ../baseline-apk
-          cp TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk ../baseline-apk/nimarkogram-original.apk
+          cd ..
+          bash scripts/sign_ci_debug_apk.sh nimarkogram/TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk 2>&1 | tee -a build-logs/original-build.log
+          cp nimarkogram/TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk baseline-apk/nimarkogram-original.apk
 
       - name: Upload original NimarkoGram baseline APK
         if: success()
@@ -116,6 +118,11 @@ jobs:
           ./gradlew --no-daemon --stacktrace --max-workers=2 \
             -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
             :TMessagesProj_AppStandalone:assembleAfatStandalone 2>&1 | tee ../build-logs/tgx-phase1-build.log
+
+      - name: Sign TGX APK with an ephemeral CI debug certificate
+        run: |
+          set -o pipefail
+          bash scripts/sign_ci_debug_apk.sh nimarkogram/TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk 2>&1 | tee -a build-logs/tgx-phase1-build.log
 
       - name: Record APK metadata
         if: always()
