@@ -78,5 +78,24 @@ foreground_dir.mkdir(parents=True, exist_ok=True)
         android:pathData="M37,33 L71,33 L71,41 L59,41 L59,61 L49,61 L49,41 L37,41 Z" />
 </vector>
 """, encoding="utf-8")
+legacy_icon_dir = root / "TMessagesProj/src/main/res/mipmap-anydpi"
+legacy_icon_dir.mkdir(parents=True, exist_ok=True)
+(legacy_icon_dir / "tgx_launcher.xml").write_text("""<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FF0B1220"
+        android:pathData="M0,0h48v48h-48z" />
+    <path
+        android:fillColor="#FF38BDF8"
+        android:pathData="M6,8 C6,5 9,3 12,3 L36,3 C39,3 42,5 42,8 L42,29 C42,32 39,35 36,35 L25,35 L15,44 L15,35 L12,35 C9,35 6,32 6,29 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M14,12 L34,12 L34,18 L27,18 L27,29 L21,29 L21,18 L14,18 Z" />
+</vector>
+""", encoding="utf-8")
 print("[OK] TGX adaptive launcher icon added (chat bubble + T monogram).")
 print("[NOTE] This Phase 1 workflow currently changes app name, application ID, and launcher icon only; theme selector and splash redesign are not implemented by this patch.")
