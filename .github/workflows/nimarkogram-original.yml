@@ -93,6 +93,11 @@ jobs:
             -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
             :TMessagesProj_AppStandalone:assembleAfatStandalone 2>&1 | tee ../build-logs/original-build.log
 
+      - name: Sign APK with an ephemeral CI debug certificate
+        run: |
+          set -o pipefail
+          bash scripts/sign_ci_debug_apk.sh nimarkogram/TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk 2>&1 | tee -a build-logs/original-build.log
+
       - name: Record build environment and output metadata
         if: always()
         run: |
