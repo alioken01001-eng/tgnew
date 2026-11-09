@@ -1,0 +1,157 @@
+name: TGX Studio Phase 1 APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: "NimarkoGram branch, tag, or commit SHA"
+        required: true
+        default: "main"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tgx-phase1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-tgx:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    env:
+      UPSTREAM_REF: ${{ inputs.upstream_ref }}
+      TG_API_ID: ${{ secrets.TG_API_ID }}
+      TG_API_HASH: ${{ secrets.TG_API_HASH }}
+      NIMARKO_BUILD_PYTHON: python3.11
+    steps:
+      - name: Checkout TGX build scripts
+        uses: actions/checkout@v4
+
+      - name: Prepare log directory
+        run: mkdir -p build-logs
+
+      - name: Validate Telegram API secrets
+        run: |
+          if [ -z "$TG_API_ID" ] || [ -z "$TG_API_HASH" ]; then
+            echo "::error::Add TG_API_ID and TG_API_HASH under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Python 3.11 (Chaquopy)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Android SDK command-line tools
+        uses: android-actions/setup-android@v3
+
+      - name: Install exact Android SDK, NDK and CMake versions
+        run: |
+          set -o pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;26.3.11579264" "cmake;3.22.1"
+          {
+            java -version 2>&1
+            python --version
+            sdkmanager --version
+            cmake --version | head -1
+          } > build-logs/toolchain.txt
+
+      - name: Clone NimarkoGram with all submodules
+        run: |
+          set -euxo pipefail
+          git clone --recursive https://github.com/Ettacent/NimarkoGram.git nimarkogram
+          git -C nimarkogram fetch origin "$UPSTREAM_REF"
+          git -C nimarkogram checkout --detach FETCH_HEAD
+          git -C nimarkogram submodule sync --recursive
+          git -C nimarkogram submodule update --init --recursive
+          git -C nimarkogram rev-parse HEAD | tee build-logs/upstream-sha.txt
+          git -C nimarkogram submodule status --recursive | tee build-logs/git-submodules.txt
+          test -f nimarkogram/docs/BUILDING.md
+          test -f nimarkogram/TMessagesProj_Modules/media/core_settings.gradle
+
+      - name: Configure private Telegram API properties
+        run: python scripts/configure_private_properties.py nimarkogram/private.properties.example nimarkogram/private.properties
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+
+      - name: Build original NimarkoGram first (baseline gate)
+        working-directory: nimarkogram
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace --max-workers=2 \
+            -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
+            :TMessagesProj_AppStandalone:assembleAfatStandalone 2>&1 | tee ../build-logs/original-build.log
+          mkdir -p ../baseline-apk
+          cd ..
+          bash scripts/sign_ci_debug_apk.sh nimarkogram/TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk 2>&1 | tee -a build-logs/original-build.log
+          cp nimarkogram/TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk baseline-apk/nimarkogram-original.apk
+
+      - name: Upload original NimarkoGram baseline APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nimarkogram-original-baseline-apk
+          path: baseline-apk/nimarkogram-original.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Apply TGX Studio Phase 1 branding patch
+        run: |
+          python scripts/apply_tgx_phase1.py nimarkogram
+          git -C nimarkogram diff --check
+          git -C nimarkogram diff --stat | tee build-logs/tgx-patch-summary.txt
+
+      - name: Build TGX Studio Phase 1 APK
+        working-directory: nimarkogram
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace --max-workers=2 \
+            -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
+            :TMessagesProj_AppStandalone:assembleAfatStandalone 2>&1 | tee ../build-logs/tgx-phase1-build.log
+
+      - name: Sign TGX APK with an ephemeral CI debug certificate
+        run: |
+          set -o pipefail
+          bash scripts/sign_ci_debug_apk.sh nimarkogram/TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk 2>&1 | tee -a build-logs/tgx-phase1-build.log
+
+      - name: Record APK metadata
+        if: always()
+        run: |
+          {
+            git -C nimarkogram rev-parse HEAD 2>&1 || true
+            git -C nimarkogram status --short 2>&1 || true
+            git -C nimarkogram submodule status --recursive 2>&1 || true
+          } > build-logs/source-status.txt
+          APK=nimarkogram/TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk
+          if [ -f "$APK" ]; then
+            stat "$APK" > build-logs/tgx-apk-stat.txt
+            sha256sum "$APK" > build-logs/tgx-apk-sha256.txt
+          fi
+
+      - name: Upload TGX Studio Phase 1 APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tgx-studio-phase1-apk
+          path: nimarkogram/TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build logs and submodule report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tgx-phase1-build-logs
+          path: build-logs/
+          if-no-files-found: warn
+          retention-days: 30
