@@ -52,6 +52,8 @@ jobs:
 
       - name: Set up Android SDK command-line tools
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install exact Android SDK, NDK and CMake versions
         run: |
