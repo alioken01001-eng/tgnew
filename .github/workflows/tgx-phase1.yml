@@ -49,7 +49,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
       - name: Set up Android SDK command-line tools
         uses: android-actions/setup-android@v3
@@ -92,6 +91,8 @@ jobs:
           ./gradlew --no-daemon --stacktrace --max-workers=2 \
             -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
             :TMessagesProj_AppStandalone:assembleAfatStandalone 2>&1 | tee ../build-logs/original-build.log
+          mkdir -p ../baseline-apk
+          cp TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk ../baseline-apk/nimarkogram-original.apk
 
       - name: Apply TGX Studio Phase 1 branding patch
         run: |
@@ -135,7 +136,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nimarkogram-original-baseline-apk
-          path: nimarkogram/TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/app.apk
+          path: baseline-apk/nimarkogram-original.apk
           if-no-files-found: error
           retention-days: 14
 
