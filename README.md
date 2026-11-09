@@ -9,6 +9,7 @@ This repository uses GitHub Actions so the Android APK can be built from an Andr
 - The TGX Studio Phase 1 workflow first builds the original upstream APK as a baseline gate, then applies a small, exact-match branding patch and builds TGX.
 - The current Phase 1 patch changes the app label, application ID and launcher icon. The Light/Dark/System selector and a custom splash-screen redesign are **not implemented yet**.
 - APKs are not considered available until a workflow run succeeds and the APK artifact appears.
+- The standalone build is unsigned by default per NimarkoGram's BUILDING.md. The workflows therefore sign each output with a newly generated, temporary CI-only debug certificate. No release keystore is created, stored, or committed. Because the certificate is ephemeral per workflow run, uninstall a previous TGX test APK before installing a later run; this is not a production release-signing setup.
 - Source is fetched from `Ettacent/NimarkoGram` with recursive submodules. The exact upstream commit and submodule SHAs are saved as artifacts.
 - NimarkoGram is GPL-2.0. Preserve upstream notices and make corresponding source available when distributing binaries, in accordance with applicable license terms.
 
@@ -44,7 +45,7 @@ These values are used only to generate the runner's temporary `private.propertie
 3. Tap the APK. If Android blocks the installation, open the prompted settings and allow **Install unknown apps** for the browser or file manager you used.
 4. Return to the installer and install the app.
 
-The TGX package ID is `app.tgxstudio.messenger`; it is a separate app from NimarkoGram and will not update an installation signed by a different certificate. The first TGX build uses the standard debug signing key supplied by the runner/Android build tools and is intended for testing, not as a stable release-signing identity.
+The TGX package ID is `app.tgxstudio.messenger`; it is a separate app from NimarkoGram. Each workflow run creates a fresh temporary debug certificate, so uninstall an earlier TGX test APK before installing a later run. These builds are for testing only, not stable release updates.
 
 ## 5. If the workflow fails
 
