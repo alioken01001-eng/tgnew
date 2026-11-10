@@ -68,7 +68,7 @@ jobs:
           {
             java -version 2>&1
             python --version
-            sdkmanager --version
+            "$SDKMANAGER" --version
             cmake --version | head -1
           } > build-logs/toolchain.txt
 
